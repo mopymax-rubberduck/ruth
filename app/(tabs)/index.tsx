@@ -1,98 +1,149 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { onAuthStateChanged } from 'firebase/auth';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Alert, Button, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-export default function HomeScreen() {
+// 👇 Ajusta la ruta según tu árbol de carpetas
+import { loginWithEmail, registerWithEmail } from '../../src/auth';
+import { deleteUser, subscribeToUser, updateUser } from '../../src/db';
+import { auth } from '../../src/firebase';
+import type { UserProfile } from '../../src/types';
+
+export default function Index() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const [displayName, setDisplayName] = useState('');
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+
+  // Suscripción al estado de auth y al perfil en Realtime Database
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        setCurrentUser(null);
+        return;
+      }
+      const stop = subscribeToUser(user.uid, (profile: UserProfile | null) => {
+        setCurrentUser(profile);
+      });
+      return () => stop();
+    });
+    return () => unsub();
+  }, []);
+
+  const canSubmit = useMemo(() => email.length > 0 && password.length >= 6, [email, password]);
+
+  const handleRegister = async () => {
+    try {
+      const profile = await registerWithEmail(email.trim(), password, displayName.trim() || undefined);
+      Alert.alert('Registro exitoso'); // mensaje concreto
+      setPassword(''); // limpia contraseña
+    } catch (e: any) {
+      Alert.alert('Error registrando', `${e?.code ?? ''} - ${e?.message ?? 'Error desconocido'}`);
+    }
+  };
+
+  const handleLogin = async () => {
+    try {
+      const res = await loginWithEmail(email.trim(), password);
+      const correo = res.user.email ?? 'usuario';
+      Alert.alert(`Bienvenido, ${correo}`);
+      setPassword('');
+    } catch (e: any) {
+      Alert.alert('Error al iniciar sesión', `${e?.code ?? ''} - ${e?.message ?? 'Error desconocido'}`);
+    }
+  };
+
+  const handleUpdateDisplayName = async () => {
+    if (!currentUser) return;
+    try {
+      await updateUser(currentUser.uid, { displayName });
+      Alert.alert('Actualizado', 'Nombre actualizado en tiempo real');
+    } catch (e: any) {
+      Alert.alert('Error al actualizar', `${e?.code ?? ''} - ${e?.message ?? 'Error desconocido'}`);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!currentUser) return;
+    try {
+      await deleteUser(currentUser.uid);
+      Alert.alert('Eliminado', 'Perfil eliminado de Realtime Database');
+    } catch (e: any) {
+      Alert.alert('Error al eliminar', `${e?.code ?? ''} - ${e?.message ?? 'Error desconocido'}`);
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.title}>Firebase Realtime DB + Auth (Expo/TS)</Text>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <View style={styles.form}>
+        <Text style={styles.label}>Correo</Text>
+        <TextInput
+          style={styles.input}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="correo@ejemplo.com"
+        />
+
+        <Text style={styles.label}>Contraseña (mín. 6)</Text>
+        <TextInput
+          style={styles.input}
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+          placeholder="********"
+        />
+
+        <Text style={styles.label}>Nombre para perfil (opcional)</Text>
+        <TextInput
+          style={styles.input}
+          value={displayName}
+          onChangeText={setDisplayName}
+          placeholder="Tu nombre"
+        />
+
+        <View style={styles.row}>
+          <Button title="Registrar" onPress={handleRegister} disabled={!canSubmit} />
+          <View style={{ width: 12 }} />
+          <Button title="Login" onPress={handleLogin} disabled={!canSubmit} />
+        </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.subtitle}>Perfil (Realtime)</Text>
+        {currentUser ? (
+          <>
+            <Text>UID: {currentUser.uid}</Text>
+            <Text>Email: {currentUser.email}</Text>
+            <Text>Nombre: {currentUser.displayName ?? '(sin nombre)'}</Text>
+            <Text>Creado: {new Date(currentUser.createdAt).toLocaleString()}</Text>
+
+            <View style={{ height: 12 }} />
+            <View style={styles.row}>
+              <Button title="Actualizar nombre" onPress={handleUpdateDisplayName} />
+              <View style={{ width: 12 }} />
+              <Button title="Eliminar perfil" color="#c62828" onPress={handleDeleteUser} />
+            </View>
+          </>
+        ) : (
+          <Text style={{ color: '#666' }}>No hay usuario autenticado.</Text>
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
+  container: { flex: 1, padding: 16, gap: 12, backgroundColor: '#ffffff' },
+  title: { fontSize: 20, fontWeight: 'bold', color: '#111' },
+  subtitle: { fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#111' },
+  form: { gap: 8 },
+  label: { fontSize: 14, color: '#333' },
+  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, color: '#111', backgroundColor: '#fff' },
+  row: { flexDirection: 'row', alignItems: 'center' },
+  card: { borderWidth: 1, borderColor: '#ddd', borderRadius: 12, padding: 12, marginTop: 12, backgroundColor: '#fff' },
 });
