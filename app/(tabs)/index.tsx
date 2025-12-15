@@ -118,6 +118,7 @@ export default function Index() {
         {currentUser ? (
           <>
             <Text>UID: {currentUser.uid}</Text>
+            <Text>yyy {currentUser.uid}</Text>
             <Text>Email: {currentUser.email}</Text>
             <Text>Nombre: {currentUser.displayName ?? '(sin nombre)'}</Text>
             <Text>Creado: {new Date(currentUser.createdAt).toLocaleString()}</Text>
