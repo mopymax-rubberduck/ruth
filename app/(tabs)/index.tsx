@@ -117,7 +117,10 @@ export default function Index() {
         <Text style={styles.subtitle}>Perfil (Realtime)</Text>
         {currentUser ? (
           <>
-            <Text>UID: {currentUser.uid}</Text>
+            
+            <Text>xx {currentUser.uid}</Text>
+
+            <Text>yyy {currentUser.uid}</Text>
             <Text>Email: {currentUser.email}</Text>
             <Text>Nombre: {currentUser.displayName ?? '(sin nombre)'}</Text>
             <Text>Creado: {new Date(currentUser.createdAt).toLocaleString()}</Text>
